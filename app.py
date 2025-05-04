@@ -32,9 +32,7 @@ def register_page():
 @app.route('/api/register', methods=['POST'])
 def register_user():
     try:
-        print(111)
         data = request.get_json()
-        print(112)
         # Validate required fields
         if not all(key in data for key in ['name', 'email', 'password', 'confirm-password']):
             return jsonify({'success': False, 'message': 'All fields are required'})
@@ -124,9 +122,8 @@ def admin_required(f):
         
         admin = db.session.query(Admin).join(User).filter(
         User.user_id == current_user.user_id,
-        User.is_admin == True
-        ).first()
-        # print(type(admin))
+        User.is_admin == True).first()
+
         if not admin:
             return jsonify({
                 'success': False,
@@ -465,7 +462,7 @@ def register_member(admin):
     """Handle member registration from the form"""
     try:       
         data = request.get_json()
-        print(data)
+
         # Validate required fields
         if not all(key in data for key in ['name', 'email', 'password', 'confirm_password']):
             return jsonify({'success': False, 'message': 'All fields are required'}), 400
@@ -662,11 +659,7 @@ def dev_book_court(current_user):
                 start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M")  # Space separator
             except ValueError:
                 start_time = datetime.fromisoformat(start_time_str)  # Python 3.7+
-            
-        # except ValueError as e:
-        #     print(111114)
-        #     return jsonify({"error": f"Invalid input format: {str(e)}"}), 400
-        
+
         # 2. Fetch user and court
         user = User.query.get(current_user.user_id)
         if not user:

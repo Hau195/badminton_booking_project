@@ -28,7 +28,7 @@ class Admin(User):
         self.access_level = kwargs.get('access_level', 'basic')
 
     def add_court(self, court):
-        print("check2!")
+
         from .court import Court
         if isinstance(court, Court):
             db.session.add(court)

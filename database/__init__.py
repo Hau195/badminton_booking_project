@@ -34,7 +34,6 @@ def _create_initial_data():
         )
         db.session.add(admin)
         db.session.commit()
-        print(admin.user_id)
 
         
         
