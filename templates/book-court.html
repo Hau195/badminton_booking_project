@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Book a Court</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        /* Improved styling */
+        .court-card {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .filter-controls {
+            background: #f8f8f8;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .filter-controls label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        .time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .time-slot {
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .time-slot:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        #booking-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            width: 80%;
+            max-width: 400px;
+        }
+        
+        #booking-modal h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .modal-buttons button:first-child {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .modal-buttons button:last-child {
+            background: #f44336;
+            color: white;
+        }
+        
+        .court-info {
+            margin-bottom: 10px;
+        }
+        
+        .court-info i {
+            margin-right: 5px;
+            color: #666;
+        }
+        
+        .no-slots {
+            color: #666;
+            font-style: italic;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div data-role="page" id="book-court-page">
+        <div data-role="header" data-position="fixed">
+            <h1>Book a Court</h1>
+            <a href="/dashboard" data-ajax="false" class="ui-btn ui-btn-left ui-icon-home ui-btn-icon-left">Dashboard</a>
+        </div>
+
+        <div role="main" class="ui-content">
+            <div class="filter-controls">
+                <div>
+                    <label for="court-type">Court Type:</label>
+                    <select id="court-type" data-role="none">
+                        <option value="all">All Courts</option>
+                        {% for court in courts|unique(attribute='court_type') %}
+                        <option value="{{ court.court_type }}">{{ court.court_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="booking-date">Date:</label>
+                    <input type="date" id="booking-date" data-role="none"
+                           min="{{ min_date }}" 
+                           max="{{ max_date }}"
+                           value="{{ min_date }}">
+                </div>
+            </div>
+            
+            <div id="courts-container">
+                {% for court in courts %}
+                <div class="court-card" data-court-type="{{ court.court_type }}">
+                    <div class="court-info">
+                        <h2>{{ court.court_type }} Court</h2>
+                        <p><i class="fas fa-map-marker-alt"></i> {{ court.location }}</p>
+                        <p><i class="far fa-clock"></i> {{ court.opening_time.strftime('%H:%M') }} - {{ court.closing_time.strftime('%H:%M') }}</p>
+                    </div>
+                    
+                    <h3>Available Slots:</h3>
+                    <div class="time-slots">
+                        {% for slot in available_slots[court.court_id]['slots'] %}
+                        <div class="time-slot" 
+                             data-date="{{ slot.date }}"
+                             data-datetime="{{ slot.datetime }}"
+                             onclick="selectSlot(this, '{{ court.court_id }}')">
+                            {{ slot.start }} - {{ slot.end }}
+                        </div>
+                        {% else %}
+                        <p class="no-slots">No available slots for selected date</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Modal Overlay -->
+        <div class="overlay" id="overlay" onclick="closeModal()"></div>
+        
+        <!-- Booking Modal -->
+        <div id="booking-modal">
+            <h2>Confirm Booking</h2>
+            <p id="selected-slot-info"></p>
+            <div class="modal-buttons">
+                <button onclick="submitBooking()"><i class="fas fa-check"></i> Confirm</button>
+                <button onclick="closeModal()"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+
+        <div data-role="footer" data-position="fixed">
+            <h4>Badminton Court System © <span id="current-year"></span></h4>
+        </div>
+    </div>
+    
+    <script>
+    $(document).ready(function() {
+        // Set current year in footer
+        $('#current-year').text(new Date().getFullYear());
+        
+        // Initialize date picker with today's date
+        const today = new Date().toISOString().split('T')[0];
+        $('#booking-date').val(today).trigger('change');
+        
+        // Set up AJAX defaults for JSON
+        $.ajaxSetup({
+            contentType: "application/json; charset=utf-8",
+            processData: false
+        });
+        $('#overlay, #booking-modal').hide();
+    });
+
+    // Filter courts by type
+    $('#court-type').change(function() {
+        const type = $(this).val();
+        $('.court-card').each(function() {
+            $(this).toggle(type === 'all' || $(this).data('court-type') === type);
+        });
+    });
+    
+    // Filter by date
+    $('#booking-date').change(function() {
+        const selectedDate = $(this).val();
+        $('.time-slot').each(function() {
+            $(this).toggle($(this).data('date') === selectedDate);
+        });
+        
+        // Show/hide "no slots" messages
+        $('.court-card').each(function() {
+            const hasVisibleSlots = $(this).find('.time-slot:visible').length > 0;
+            $(this).find('.no-slots').toggle(!hasVisibleSlots);
+        });
+    });
+    
+    // Booking functionality
+    let selectedSlot = null;
+    
+    function selectSlot(element, courtId) {
+        selectedSlot = {
+            courtId: courtId,
+            datetime: $(element).data('datetime'),
+            displayTime: $(element).text()
+        };
+        
+        $('#selected-slot-info').html(`
+            <strong>Court ${courtId}</strong><br>
+            <i class="far fa-calendar-alt"></i> ${selectedSlot.datetime.split('T')[0]}<br>
+            <i class="far fa-clock"></i> ${selectedSlot.displayTime}
+        `);
+        
+        $('#overlay, #booking-modal').fadeIn();
+    }
+    
+    function submitBooking() {
+    if (!selectedSlot) return;
+    
+    // Show loading state
+    $('#booking-modal button').prop('disabled', true);
+    $('#booking-modal button:first-child').html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+    
+    $.ajax({
+        url: '/api/book-court',
+        method: 'POST',
+        data: JSON.stringify({
+            court_id: selectedSlot.courtId,
+            start_time: selectedSlot.datetime,
+            duration: 60
+        }),
+        success: function(response) {
+            console.log("Booking response:", response); // Debug log
+            
+            // Updated success condition to match backend response
+            if (response && (response.status === "confirmed" || response.message)) {
+                $('#selected-slot-info').html(`
+                    <div style="color: #4CAF50;">
+                        <i class="fas fa-check-circle"></i> ${response.message || 'Booking confirmed!'}<br>
+                        <strong>Court ${selectedSlot.courtId}</strong><br>
+                        ${selectedSlot.displayTime}<br>
+                        <small>Reservation ID: ${response.reservation_id || ''}</small>
+                    </div>
+                `);
+                
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                // Handle cases where the response format doesn't match
+                const errorMsg = response?.error || 'Booking failed - unexpected response';
+                $('#selected-slot-info').html(`
+                    <div style="color: #f44336;">
+                        <i class="fas fa-exclamation-circle"></i> ${errorMsg}
+                    </div>
+                `);
+            }
+        },
+        error: function(xhr) {
+            console.error("Booking error:", xhr.responseJSON); // Debug log
+            
+            let errorMsg = 'Server error during booking';
+            try {
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                } else if (xhr.responseJSON && xhr.responseJSON.details) {
+                    errorMsg = xhr.responseJSON.details;
+                }
+            } catch(e) {
+                console.error("Error parsing error response:", e);
+            }
+            
+            $('#selected-slot-info').html(`
+                <div style="color: #f44336;">
+                    <i class="fas fa-exclamation-circle"></i> ${errorMsg}
+                </div>
+            `);
+        },
+        complete: function() {
+            $('#booking-modal button').prop('disabled', false);
+            $('#booking-modal button:first-child').html('<i class="fas fa-check"></i> Confirm');
+        }
+    });
+}
+    
+    function closeModal() {
+        $('#overlay, #booking-modal').fadeOut();
+        selectedSlot = null;
+    }
+    // Clear any booking success messages from URL on page load
+    if (window.location.search.includes('booking_success')) {
+        history.replaceState({}, document.title, window.location.pathname);
+    }
+</script>
+</body>
+</html>

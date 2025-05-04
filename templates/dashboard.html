@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Badminton Court - Dashboard</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        .welcome-message {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+            color: #2c3e50;
+        }
+        .dashboard-button {
+            margin: 10px 0;
+            padding: 12px 0;
+            font-size: 1.1em;
+        }
+        .admin-section {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 2px solid #3498db;
+        }
+        .admin-title {
+            color: #e74c3c;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div data-role="page" id="dashboard-page">
+        <!-- Header with user info -->
+        <div data-role="header" data-position="fixed" data-theme="b">
+            <h1>Dashboard</h1>
+            <a href="#user-popup" data-rel="popup" class="ui-btn ui-btn-left ui-icon-user ui-btn-icon-left" id="user-btn"></a>
+            <a href="#logout-popup" data-rel="popup" class="ui-btn ui-btn-right ui-icon-power ui-btn-icon-left">Logout</a>
+        </div>
+
+        <div role="main" class="ui-content">
+            <!-- Welcome Message -->
+            <div class="welcome-message">
+                Welcome back, <span id="user-name"></span>!
+            </div>
+            
+            <!-- Main Actions -->
+            <div class="ui-grid-solo">
+                <div class="ui-block-a">
+                    <a href="book-court" class="ui-btn ui-btn-b ui-corner-all dashboard-button" data-ajax="false">Book a Court</a>
+                    <a href="my-reservations" class="ui-btn ui-btn-b ui-corner-all dashboard-button" data-ajax="false">My Reservations</a>
+                </div>
+            </div>
+            
+            <!-- Admin Section (Hidden by default) -->
+            <div id="admin-section" class="admin-section" style="display:none;">
+                <h3 class="admin-title">Administrator Tools</h3>
+                <div class="ui-grid-a">
+                    <div class="ui-block-a">
+                        <a href="admin/manage-court" class="ui-btn ui-btn-a ui-corner-all dashboard-button" data-ajax="false">
+                            Manage Courts
+                        </a>
+                    </div>
+                    <div class="ui-block-b">
+                        <a href="/admin/reservations" class="ui-btn ui-btn-a ui-corner-all dashboard-button" data-ajax="false">
+                            All Reservations
+                        </a>
+                    </div>
+                    <div class="ui-block-a">
+                        <a href="/admin/member-management" class="ui-btn ui-btn-a ui-corner-all dashboard-button" data-ajax="false">
+                            Member Management
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div data-role="footer" data-position="fixed" data-theme="b">
+            <h4>Badminton Court System © <span id="current-year"></span></h4>
+        </div>
+        
+        <!-- User Info Popup -->
+        <div data-role="popup" id="user-popup" data-overlay-theme="b" data-theme="b" data-position-to="origin">
+            <div data-role="header" data-theme="a">
+                <h1>User Profile</h1>
+            </div>
+            <div role="main" class="ui-content">
+                <p><strong>Name:</strong> <span id="popup-name"></span></p>
+                <p><strong>Email:</strong> <span id="popup-email"></span></p>
+                <p><strong>Account Type:</strong> <span id="popup-role"></span></p>
+            </div>
+        </div>
+        
+        <!-- Logout Confirmation Popup -->
+        <div data-role="popup" id="logout-popup" data-overlay-theme="b" data-theme="b" data-dismissible="false">
+            <div data-role="header" data-theme="a">
+                <h1>Confirm Logout</h1>
+            </div>
+            <div role="main" class="ui-content">
+                <p>Are you sure you want to logout?</p>
+                <div class="ui-grid-a">
+                    <div class="ui-block-a">
+                        <a href="#" class="ui-btn ui-corner-all ui-btn-a" data-rel="back">Cancel</a>
+                    </div>
+                    <div class="ui-block-b">
+                        <a href="#" id="confirm-logout" class="ui-btn ui-corner-all ui-btn-b">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    
+
+    $(document).on('pagecreate', '#dashboard-page', function() {
+        // Set current year in footer
+        $('#current-year').text(new Date().getFullYear());
+        
+        // Check authentication status
+        checkAuthStatus();
+        
+        // Periodically check auth status (every 5 minutes)
+        setInterval(checkAuthStatus, 300000);
+        
+        // Logout handler
+        $('#confirm-logout').on('click', function() {
+            $.ajax({
+                url: '/api/logout',
+                method: 'POST',
+                success: function() {
+                    localStorage.removeItem('userData');
+                    window.location.href = 'login';
+                }
+            });
+        });
+    });
+    
+    function checkAuthStatus() {
+        $.ajax({
+            url: '/api/check-auth',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    displayUserData(response.user);
+                    localStorage.setItem('isAdmin', response.user.is_admin);
+                } else {
+                    window.location.href = 'login?session=expired';
+                }
+            },
+            error: function() {
+                window.location.href = 'login?error=auth_check';
+            }
+        });
+    }
+    
+    function displayUserData(user) {
+        // Store user data in localStorage
+        localStorage.setItem('userData', JSON.stringify(user));
+        // Display user info
+        $('#user-name').text(user.name);
+        $('#popup-name').text(user.name);
+        $('#popup-email').text(user.email);
+        $('#popup-role').text(user.is_admin ? 'Administrator' : 'Member');
+        
+        // Show admin section if user is admin
+        if (user.is_admin) {
+            $('#admin-section').show();
+        }
+    }
+    </script>
+</body>
+</html>

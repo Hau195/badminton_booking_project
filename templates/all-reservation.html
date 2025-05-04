@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Manage Reservations</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .filter-card {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .reservation-card {
+            margin-bottom: 15px;
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+        .reservation-card.pending { border-color: #ffc107; }
+        .reservation-card.confirmed { border-color: #28a745; }
+        .reservation-card.cancelled { border-color: #dc3545; }
+        .reservation-card.completed { border-color: #17a2b8; }
+        .action-buttons .btn {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        #loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-calendar-check"></i> Manage Reservations</h1>
+            <a href="/dashboard" data-ajax="false" data-rel="back" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filter-card">
+            <h4><i class="bi bi-funnel"></i> Filters</h4>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select id="status-filter" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="date-filter" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Court</label>
+                    <select id="court-filter" class="form-select">
+                        <option value="">All Courts</option>
+                        <!-- Will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">User</label>
+                    <input type="text" id="user-filter" class="form-control" placeholder="User ID or email">
+                </div>
+            </div>
+            <div class="mt-3">
+                <button id="apply-filters" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Apply Filters
+                </button>
+                <button id="reset-filters" class="btn btn-outline-secondary ms-2">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+        
+        <!-- Loading Spinner -->
+        <div id="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading reservations...</p>
+        </div>
+        
+        <!-- Reservations List -->
+        <div id="reservations-container">
+            <!-- Will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Modal for editing status -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Reservation Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-reservation-id">
+                    <select id="status-select" class="form-select">
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" id="save-status" class="btn btn-primary">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize variables
+        let allCourts = [];
+        const modal = new bootstrap.Modal(document.getElementById('editModal'));
+        
+        // DOM Ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCourts();
+            loadReservations();
+            
+            // Event listeners
+            document.getElementById('apply-filters').addEventListener('click', loadReservations);
+            document.getElementById('reset-filters').addEventListener('click', resetFilters);
+            document.getElementById('save-status').addEventListener('click', updateReservationStatus);
+        });
+        
+        // Load courts for filter dropdown
+        function loadCourts() {
+            fetch('/api/admin/courts')
+                .then(response => response.json())
+                .then(data => {
+                    allCourts = data.courts;
+                    const select = document.getElementById('court-filter');
+                    allCourts.forEach(court => {
+                        const option = document.createElement('option');
+                        option.value = court.court_id;
+                        option.textContent = `${court.court_type} - ${court.location}`;
+                        select.appendChild(option);
+                    });
+                });
+        }
+        
+        // Load reservations with filters
+        function loadReservations() {
+            const spinner = document.getElementById('loading-spinner');
+            const container = document.getElementById('reservations-container');
+            
+            spinner.style.display = 'block';
+            container.innerHTML = '';
+            
+            // Get filter values
+            const params = new URLSearchParams({
+                status: document.getElementById('status-filter').value,
+                date: document.getElementById('date-filter').value,
+                court_id: document.getElementById('court-filter').value,
+                user_id: document.getElementById('user-filter').value
+            });
+            
+            fetch(`/api/admin/reservations?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.reservations && data.reservations.length > 0) {
+                        renderReservations(data.reservations);
+                    } else {
+                        container.innerHTML = `
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No reservations found matching your criteria
+                            </div>`;
+                    }
+                })
+                .catch(error => {
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> Error loading reservations: ${error.message}
+                        </div>`;
+                })
+                .finally(() => {
+                    spinner.style.display = 'none';
+                });
+        }
+        
+        // Render reservations list
+        function renderReservations(reservations) {
+            const container = document.getElementById('reservations-container');
+            container.innerHTML = '';
+            
+            reservations.forEach(res => {
+                const startTime = new Date(res.time_slot.start);
+                const endTime = new Date(res.time_slot.end);
+                
+                const card = document.createElement('div');
+                card.className = `card reservation-card ${res.status}`;
+                card.innerHTML = `
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <h5 class="card-title">${res.court.type} Court</h5>
+                                <p class="card-text text-muted">
+                                    <i class="bi bi-geo-alt"></i> ${res.court.location}
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="card-text">
+                                    <i class="bi bi-calendar"></i> ${startTime.toLocaleDateString()}
+                                </p>
+                                <p class="card-text">
+                                    <i class="bi bi-clock"></i> ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="card-text">
+                                    <i class="bi bi-person"></i> ${res.user.name}
+                                </p>
+                                <p class="card-text">
+                                    <i class="bi bi-envelope"></i> ${res.user.email}
+                                </p>
+                            </div>
+                            <div class="col-md-3">
+                                <span class="badge bg-${getStatusBadgeColor(res.status)}">
+                                    ${res.status.charAt(0).toUpperCase() + res.status.slice(1)}
+                                </span>
+                                <div class="action-buttons mt-2">
+                                    ${res.can_modify ? `
+                                    <button class="btn btn-sm btn-outline-primary edit-btn" data-id="${res.id}">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${res.id}">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                
+                container.appendChild(card);
+            });
+            
+            // Add event listeners to action buttons
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const reservationId = this.getAttribute('data-id');
+                    openEditModal(reservationId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const reservationId = this.getAttribute('data-id');
+                    if (confirm('Are you sure you want to delete this reservation?')) {
+                        deleteReservation(reservationId);
+                    }
+                });
+            });
+        }
+        
+        // Helper function for status badge colors
+        function getStatusBadgeColor(status) {
+            switch(status) {
+                case 'pending': return 'warning';
+                case 'confirmed': return 'success';
+                case 'cancelled': return 'danger';
+                case 'completed': return 'info';
+                default: return 'secondary';
+            }
+        }
+        
+        // Reset all filters
+        function resetFilters() {
+            document.getElementById('status-filter').value = '';
+            document.getElementById('date-filter').value = '';
+            document.getElementById('court-filter').value = '';
+            document.getElementById('user-filter').value = '';
+            loadReservations();
+        }
+        
+        // Open edit modal
+        function openEditModal(reservationId) {
+            document.getElementById('edit-reservation-id').value = reservationId;
+            modal.show();
+        }
+        
+        // Update reservation status
+        function updateReservationStatus() {
+            const reservationId = document.getElementById('edit-reservation-id').value;
+            const newStatus = document.getElementById('status-select').value;
+            
+            fetch(`/api/admin/reservations/${reservationId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    modal.hide();
+                    loadReservations();
+                } else {
+                    alert('Error updating reservation: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Error updating reservation: ' + error.message);
+            });
+        }
+        
+        // Delete reservation
+        function deleteReservation(reservationId) {
+            fetch(`/api/admin/reservations/${reservationId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadReservations();
+                } else {
+                    alert('Error deleting reservation: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Error deleting reservation: ' + error.message);
+            });
+        }
+    </script>
+</body>
+</html>

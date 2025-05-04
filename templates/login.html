@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Badminton Court - Login</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        .ui-content {
+            padding: 15px;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div data-role="page" id="login-page">
+        <div data-role="header" data-position="fixed">
+            <h1>Login</h1>
+            <a href="/register" data-ajax="false" class="ui-btn ui-btn-left ui-icon-user ui-btn-icon-left">Register</a>
+        </div>
+
+        <div role="main" class="ui-content">
+            <div id="response-message"></div>
+            
+            <form action="/api/login" method="POST" id="login-form">
+                <div class="ui-field-contain">
+                    <label for="login-email">Email:</label>
+                    <input type="email" name="email" id="login-email" required>
+                </div>
+                
+                <div class="ui-field-contain">
+                    <label for="login-password">Password:</label>
+                    <input type="password" name="password" id="login-password" required>
+                </div>
+                
+                <button type="submit" class="ui-btn ui-btn-b ui-corner-all">Login</button>
+            </form>
+        </div>
+
+        <div data-role="footer" data-position="fixed">
+            <h4>Badminton Court System © <span id="current-year"></span></h4>
+        </div>
+    </div>
+
+    <script>
+        
+        $(document).on('pagecreate', '#login-page', function() {
+            // Set current year in footer
+            $('#current-year').text(new Date().getFullYear());
+            // Check if already logged in
+            // if(localStorage.getItem('auth_token')) {
+            //     window.location.href = '/dashboard';
+            // }   
+            $('#login-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                $.mobile.loading('show');
+                
+                const formData = {
+                    email: $('#login-email').val(),
+                    password: $('#login-password').val()
+                };
+                
+                $.ajax({
+                    url: '/api/login',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),       
+                    success: function(response) {
+                        if (response.success) {
+                            // Store token in localStorage
+                            localStorage.setItem('auth_token', response.token);
+                            localStorage.setItem('user', JSON.stringify(response.user));
+                            
+                            // Redirect to dashboard
+                            window.location.href = response.redirect;
+                        } else {
+                            $('#response-message').html(
+                                `<div class="ui-body ui-body-a ui-corner-all" style="color:red;">
+                                    ${response.message}
+                                </div>`
+                            );
+                        }
+                    },
+                    error: function(xhr) {
+                        let message = 'Login failed. Please try again.';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            message = response.message || message;
+                        } catch (e) {}
+                        
+                        $('#response-message').html(
+                            `<div class="ui-body ui-body-a ui-corner-all" style="color:red;">
+                                ${message}
+                            </div>`
+                        );
+                    },
+                    complete: function() {
+                        $.mobile.loading('hide');
+                        $.mobile.silentScroll($('#response-message').offset().top);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

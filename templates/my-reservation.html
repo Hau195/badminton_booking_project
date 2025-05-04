@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Reservations</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        .reservation-card {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .status-pending { color: #f39c12; }
+        .status-confirmed { color: #2ecc71; }
+        .status-cancelled { color: #e74c3c; }
+        .status-completed { color: #3498db; }
+    </style>
+</head>
+<body>
+    <div data-role="page" id="reservations-page">
+        <div data-role="header" data-position="fixed" data-theme="b">
+            <a href="/dashboard" data-ajax="false" class="ui-btn ui-btn-left ui-icon-arrow-l ui-btn-icon-left">Back</a>
+            <h1>My Reservations</h1>
+        </div>
+
+        <div role="main" class="ui-content">
+            <div id="reservations-list">
+                <!-- Reservations will be loaded here -->
+                <p>Loading your reservations...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    $(document).on('pagecreate', '#reservations-page', function() {
+        loadReservations();
+        
+        // Handle refresh
+        $(document).on('click', '#refresh-reservations', function() {
+            loadReservations();
+        });
+        
+        // Handle cancellation
+        $(document).on('click', '.cancel-btn', function() {
+            const reservationId = $(this).data('id');
+            cancelReservation(reservationId);
+        });
+    });
+    
+    function loadReservations() {
+        $.ajax({
+            url: '/api/my-reservations',
+            method: 'GET',
+            success: function(response) {
+                if (response.reservations && response.reservations.length > 0) {
+                    renderReservations(response.reservations);
+                } else {
+                    $('#reservations-list').html(
+                        '<div class="ui-body ui-body-a ui-corner-all">' +
+                        '<h3>No reservations found</h3>' +
+                        '<p>You haven\'t made any reservations yet.</p>' +
+                        '</div>'
+                    );
+                }
+            },
+            error: function() {
+                $('#reservations-list').html(
+                    '<div class="ui-body ui-body-a ui-corner-all">' +
+                    '<h3>Error loading reservations</h3>' +
+                    '<p>Please try again later.</p>' +
+                    '</div>'
+                );
+            }
+        });
+    }
+    
+
+    function renderReservations(reservations) {
+        let html = '';
+    
+        reservations.forEach(res => {
+            const isPast = new Date(res.date + 'T' + res.end_time) < new Date();
+            const cardClass = isPast ? 'past-reservation' : '';
+            
+            html += `
+            <div class="reservation-card ${cardClass}">
+                <h3>${res.court} Court</h3>
+                <p><strong>Location:</strong> ${res.location}</p>
+                <p><strong>Date:</strong> ${res.date}</p>
+                <p><strong>Time:</strong> ${res.start_time} - ${res.end_time}</p>
+                <p><strong>Status:</strong> 
+                    <span class="status-${res.status}">${res.status}</span>
+                </p>
+                <button class="cancel-btn ui-btn ui-btn-b" 
+                        data-id="${res.id}">
+                    Cancel Reservation
+                </button>
+            </div>`;
+        });
+        
+        // Add refresh button
+        html += `
+        <button id="refresh-reservations" 
+                class="ui-btn ui-btn-icon-left ui-icon-refresh">
+            Refresh List
+        </button>`;
+        
+        $('#reservations-list').html(html).trigger('create');
+    }
+    
+    function cancelReservation(reservationId) {
+        if (!confirm("Are you sure you want to cancel this reservation?")) {
+            return;
+        }
+        
+        $.ajax({
+            url: `/api/reservations/${reservationId}/cancel`,
+            method: 'POST',
+            success: function() {
+                alert("Reservation cancelled successfully");
+                loadReservations();
+            },
+            error: function() {
+                alert("Failed to cancel reservation");
+            }
+        });
+    }
+    </script>
+</body>
+</html>

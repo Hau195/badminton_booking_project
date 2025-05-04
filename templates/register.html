@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Badminton Court - Register</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        .ui-content {
+            padding: 15px;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin: 5px 0;
+        }
+        .success-message {
+            color: #2ecc71;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Registration Page -->
+    <div data-role="page" id="register-page">
+        <div data-role="header" data-position="fixed">
+            <h1>Register Account</h1>
+            <a href="/login" data-ajax="false" class="ui-btn ui-btn-left ui-icon-arrow-l ui-btn-icon-left">Login</a>
+        </div>
+
+        <div role="main" class="ui-content">
+            <div id="response-message"></div>
+            
+            <form action="/api/register" method="POST" id="register-form">
+                <div class="ui-field-contain">
+                    <label for="name">Full Name:</label>
+                    <input type="text" name="name" id="name" required>
+                </div>
+                
+                <div class="ui-field-contain">
+                    <label for="email">Email:</label>
+                    <input type="email" name="email" id="email" required>
+                </div>
+                
+                <div class="ui-field-contain">
+                    <label for="password">Password:</label>
+                    <input type="password" name="password" id="password" required>
+                </div>
+                
+                <div class="ui-field-contain">
+                    <label for="confirm-password">Confirm Password:</label>
+                    <input type="password" name="confirm-password" id="confirm-password" required>
+                </div>
+                
+                <button type="submit" class="ui-btn ui-btn-b ui-corner-all">Register</button>
+            </form>
+        </div>
+
+        <div data-role="footer" data-position="fixed">
+            <h4>Badminton Court System © <span id="current-year"></span></h4>
+        </div>
+    </div>
+
+    <script>
+       
+        $(document).on('pageinit', '#register-page', function() {
+            
+            // Set current year in footer
+            $('#current-year').text(new Date().getFullYear());
+            $('#register-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Show loading indicator
+                $.mobile.loading('show');
+                
+                // Get form data
+                const formData = {
+                    name: $('#name').val(),
+                    email: $('#email').val(),
+                    password: $('#password').val(),
+                    'confirm-password': $('#confirm-password').val()
+                };
+                
+                // Send AJAX request
+                $.ajax({
+                    url: '/api/register',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#response-message').html(
+                                `<div class="ui-body ui-body-a ui-corner-all" style="color:green;">
+                                    ${response.message}
+                                </div>`
+                            );
+                            
+                            // Redirect after 2 seconds
+                            setTimeout(function() {
+                                window.location.href = response.redirect;
+                            }, 2000);
+                        } else {
+                            $('#response-message').html(
+                                `<div class="ui-body ui-body-a ui-corner-all" style="color:red;">
+                                    ${response.message}
+                                </div>`
+                            );
+                        }
+                    },
+                    error: function(xhr) {
+                        console.log
+                        let message = 'An error occurred during registration';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            message = response.message || message;
+                        } catch (e) {}
+                        
+                        $('#response-message').html(
+                            `<div class="ui-body ui-body-a ui-corner-all" style="color:red;">
+                                ${message}
+                            </div>`
+                        );
+                    },
+                    complete: function() {
+                        $.mobile.loading('hide');
+                        // Scroll to message
+                        $.mobile.silentScroll($('#response-message').offset().top);
+                    }
+                });
+            });
+        });
+    
+    </script>
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Member Management</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    <style>
+        .member-form {
+            margin: 15px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin: 5px 0;
+        }
+        .success-message {
+            color: #2ecc71;
+            margin: 5px 0;
+        }
+        .member-list {
+            margin-top: 20px;
+        }
+        .member-card {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div data-role="page" id="member-management-page">
+        <div data-role="header" data-position="fixed" data-theme="b">
+            <h1>Member Management</h1>
+            <a href="/dashboard" data-ajax="false" class="ui-btn ui-btn-left ui-icon-home ui-btn-icon-left">Dashboard</a>
+        </div>
+
+        <div role="main" class="ui-content">
+            <div data-role="tabs">
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#register-tab" class="ui-btn-active">Register</a></li>
+                        <li><a href="#update-tab">Update</a></li>
+                        <li><a href="#list-tab">Member List</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Register Tab -->
+                <div id="register-tab">
+                    <form id="register-form" class="member-form">
+                        <h3>Register New Member</h3>
+                        <div class="ui-field-contain">
+                            <label for="reg-name">Name:</label>
+                            <input type="text" name="name" id="reg-name" required>
+                            
+                            <label for="reg-email">Email:</label>
+                            <input type="email" name="email" id="reg-email" required>
+                            
+                            <label for="reg-password">Password:</label>
+                            <input type="password" name="password" id="reg-password" required>
+                            
+                            <label for="reg-confirm-password">Confirm Password:</label>
+                            <input type="password" name="confirm_password" id="reg-confirm-password" required>
+                        </div>
+                        <div id="register-error" class="error-message"></div>
+                        <div id="register-success" class="success-message"></div>
+                        <button type="submit" class="ui-btn ui-btn-b">Register</button>
+                    </form>
+                </div>
+                
+                <!-- Update Tab -->
+                <div id="update-tab">
+                    <form id="update-form" class="member-form">
+                        <h3>Update Member Details</h3>
+                        <div class="ui-field-contain">
+                            <label for="update-email">Email (to find member):</label>
+                            <input type="email" name="email" id="update-email" required>
+                            
+                            <label for="update-name">New Name:</label>
+                            <input type="text" name="name" id="update-name">
+                            
+                            <label for="update-password">New Password:</label>
+                            <input type="password" name="password" id="update-password">
+                            
+                            <label for="update-confirm-password">Confirm New Password:</label>
+                            <input type="password" name="confirm_password" id="update-confirm-password">
+                        </div>
+                        <div id="update-error" class="error-message"></div>
+                        <div id="update-success" class="success-message"></div>
+                        <button type="submit" class="ui-btn ui-btn-b">Update</button>
+                        <button type="button" id="delete-btn" class="ui-btn ui-btn-d">Delete Member</button>
+                    </form>
+                </div>
+                
+                <!-- Member List Tab -->
+                <div id="list-tab">
+                    <div class="member-list" id="member-list">
+                        <p>Loading member list...</p>
+                    </div>
+                    <button id="refresh-members" class="ui-btn ui-btn-icon-left ui-icon-refresh">
+                        Refresh List
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    $.ajaxSetup({
+        contentType: "application/json; charset=utf-8",
+        processData: false
+    });    
+    $(document).on('pagecreate', '#member-management-page', function() {
+        // Load initial member list
+        loadMembers();
+        
+        // Handle registration form submission
+        $('#register-form').on('submit', function(e) {
+            e.preventDefault();
+            registerMember();
+        });
+        
+        // Handle update form submission
+        $('#update-form').on('submit', function(e) {
+            e.preventDefault();
+            updateMember();
+        });
+        
+        // Handle delete button
+        $('#delete-btn').on('click', function() {
+            deleteMember();
+        });
+        
+        // Handle refresh button
+        $('#refresh-members').on('click', function() {
+            loadMembers();
+        });
+    });
+    
+    function loadMembers() {
+        $.ajax({
+            url: '/api/members',
+            method: 'GET',
+            success: function(response) {
+                if (response.members && response.members.length > 0) {
+                    renderMembers(response.members);
+                } else {
+                    $('#member-list').html(
+                        '<div class="ui-body ui-body-a ui-corner-all">' +
+                        '<h3>No members found</h3>' +
+                        '</div>'
+                    );
+                }
+            },
+            error: function() {
+                $('#member-list').html(
+                    '<div class="ui-body ui-body-a ui-corner-all">' +
+                    '<h3>Error loading members</h3>' +
+                    '<p>Please try again later.</p>' +
+                    '</div>'
+                );
+            }
+        });
+    }
+    
+    function renderMembers(members) {
+        let html = '';
+        
+        members.forEach(member => {
+            html += `
+            <div class="member-card">
+                <h3>${member.name}</h3>
+                <p><strong>Email:</strong> ${member.email}</p>
+                <p><strong>Member Since:</strong> ${new Date(member.created_at).toLocaleDateString()}</p>
+            </div>`;
+        });
+        
+        $('#member-list').html(html);
+    }
+    
+    function registerMember() {
+        // Set default AJAX settings for JSON
+        $.ajaxSetup({
+            contentType: "application/json; charset=utf-8",
+            processData: false
+        });
+        
+        // Get form data
+        const formData = {
+            name: $('#reg-name').val(),
+            email: $('#reg-email').val(),
+            password: $('#reg-password').val(),
+            confirm_password: $('#reg-confirm-password').val()
+        };
+
+        // Client-side validation
+        if (formData.password !== formData.confirm_password) {
+            $('#register-error').text('Passwords do not match').show();
+            return;
+        }
+
+        // Send as JSON
+        $.ajax({
+            url: '/api/members/register',
+            type: 'POST',
+            data: JSON.stringify(formData),
+            contentType: 'application/json',
+            success: function(response) {
+                if (response.success) {
+                    $('#register-success').text(response.message).show();
+                    $('#register-form')[0].reset();
+                } else {
+                    $('#register-error').text(response.error).show();
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Server error';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                $('#register-error').text(errorMsg).show();
+            }
+        });
+    }
+    
+    function updateMember() {
+        const email = $('#update-email').val();
+        const name = $('#update-name').val();
+        const password = $('#update-password').val();
+        const confirmPassword = $('#update-confirm-password').val();
+        
+        // Validation
+        if (password && password !== confirmPassword) {
+            showMessage('update-error', 'Passwords do not match');
+            return;
+        }
+        
+        clearMessages('update');
+        
+        const data = JSON.stringify({
+            email: email,
+            name: name,
+            password: password,
+            confirm_password: confirmPassword
+        });
+        
+        $.ajax({
+            url: '/api/members/update',
+            method: 'POST',
+            contentType: 'application/json',
+            data: data,
+            success: function(response) {
+                if (response.success) {
+                    showMessage('update-success', 'Member updated successfully');
+                    $('#update-form')[0].reset();
+                    loadMembers(); // Refresh the list
+                } else {
+                    showMessage('update-error', response.error || 'Update failed');
+                }
+            },
+            error: function(xhr) {
+                showMessage('update-error', xhr.responseJSON?.error || 'Error updating member');
+            }
+        });
+    }
+    
+    function deleteMember() {
+        const email = $('#update-email').val();
+        
+        if (!email) {
+            showMessage('update-error', 'Please enter an email to delete');
+            return;
+        }
+        
+        if (!confirm('Are you sure you want to delete this member?')) {
+            return;
+        }
+        
+        clearMessages('update');
+        
+        const data = JSON.stringify({
+            email: email
+        });
+        
+        $.ajax({
+            url: '/api/members/delete',
+            contentType: 'application/json',
+            method: 'POST',
+            data: data,
+            success: function(response) {
+                if (response.success) {
+                    showMessage('update-success', 'Member deleted successfully');
+                    $('#update-form')[0].reset();
+                    loadMembers(); // Refresh the list
+                } else {
+                    showMessage('update-error', response.error || 'Deletion failed');
+                }
+            },
+            error: function(xhr) {
+                showMessage('update-error', xhr.responseJSON?.error || 'Error deleting member');
+            }
+        });
+    }
+    
+    function showMessage(type, message) {
+        const $element = $('#' + type);
+        $element.text(message).show();
+        setTimeout(() => $element.fadeOut(), 5000);
+    }
+    
+    function clearMessages(formType) {
+        $('#' + formType + '-error').hide();
+        $('#' + formType + '-success').hide();
+    }
+    </script>
+</body>
+</html>
