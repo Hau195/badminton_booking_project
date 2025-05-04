@@ -11,21 +11,8 @@ class Admin(User):
     __mapper_args__ = {
         'polymorphic_identity': 'admin',
         'inherit_condition': (admin_id == User.user_id),
-        'concrete': True  # Add this for concrete table inheritance
     }
 
-    def __init__(self, **kwargs):
-        # First create the User part
-        user_kwargs = {
-            'name': kwargs.pop('name'),
-            'email': kwargs.pop('email'),
-            'password_hash': kwargs.pop('password_hash'),
-            'is_admin': True  # Always True for Admin instances
-        }
-        super().__init__(**user_kwargs)
-        
-        # Then set Admin-specific fields
-        self.access_level = kwargs.get('access_level', 'basic')
 
     def add_court(self, court):
 

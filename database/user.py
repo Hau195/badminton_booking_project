@@ -10,10 +10,17 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)
+    type = db.Column(db.String(50))  # polymorphic field
     
     # Relationships
     reservations = db.relationship('Reservation', back_populates='user', cascade='all, delete-orphan')
     
+    __mapper_args__ = {
+        'polymorphic_identity': 'user',
+        'polymorphic_on': type,
+        'with_polymorphic': '*'
+    }    
+
     @property
     def password(self):
         raise AttributeError('password is not a readable attribute')
