@@ -13,11 +13,8 @@ class Authentication:
 
         # Find user (use one query to avoid timing leaks)
         user = User.query.filter_by(email=email).first()
-        # students = User.query.all()
 
-        # for student in students:
-        #     print(f'ID: {student.user_id}, Name: {student.name}, {student.password_hash}' )
-        
+
         if user and user.verify_password(password):
             # Optional: Check if account is active
             if hasattr(user, 'is_active') and not user.is_active:
